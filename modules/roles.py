@@ -86,7 +86,7 @@ class Roles:
                 await self.strip_chapter_roles(context, chapter_prefix)
                 await self.strip_route_roles(context, route_prefix)
                 # add the new role
-                await context.messsage.author.add_roles(target_role)
+                await context.message.author.add_roles(target_role)
                 await context.send("Successfully added the {} role.".format(target_role.name))
             else:
                 await context.send("Role {} not found, which should not be the case. Contact someone who is administrating the server to add it.".format(role))
