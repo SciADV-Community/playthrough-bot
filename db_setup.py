@@ -17,6 +17,7 @@ def table_setup(client):
     CREATE TABLE IF NOT EXISTS Game (
         Name VARCHAR(255) UNIQUE NOT NULL,
         Role_Name VARCHAR(255) NOT NULL,
+        Progress INT(1) DEFAULT 0,
         Channel_suffix VARCHAR(255) NOT NULL,
         PRIMARY KEY(Name)
     )

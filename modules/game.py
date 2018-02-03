@@ -47,13 +47,18 @@ class Game:
 
     # add a game
     @commands.command(pass_context=True)
-    async def addgame(self, context, game: str, role: str, channel_suffix: str, *aliases):
+    async def addgame(self, context, game: str, role: str, progress: str, channel_suffix: str, *aliases):
         if self.fetch_game(game) is not None: # if it exists
             await context.send("Game {} already exists".format(game))
         else: # if not
             if modules.admin.Admin(self.client).is_admin(context):
+                # Parsing the progress parameter
+                if progress == "Yes":
+                    prog = 1
+                else:
+                    prog = 0
                 # insert the game info
-                self.client.cursor.execute("INSERT INTO Game (Name, Role_Name, Channel_suffix) VALUES (?, ?)", (game, role, channel_suffix,))
+                self.client.cursor.execute("INSERT INTO Game (Name, Role_Name, Progress, Channel_suffix) VALUES (?, ?, ?, ?)", (game, role, prog, channel_suffix,))
                 # insert all the aliases
                 if aliases is not None:
                     for alias in aliases:

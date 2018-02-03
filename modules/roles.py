@@ -75,16 +75,17 @@ class Roles:
     @commands.command(pass_context=True)
     async def finished(self, context, *, game: str):
         # Getting the role for the game
-        self.client.cursor.execute("SELECT Role_Name FROM Game JOIN Game_Alias ON Game.Name = Game_Alias.Game_Name WHERE Game.Name = ? OR Game_Alias.Alias = ?", (game, game,))
+        self.client.cursor.execute("SELECT Role_Name, Progress FROM Game JOIN Game_Alias ON Game.Name = Game_Alias.Game_Name WHERE Game.Name = ? OR Game_Alias.Alias = ?", (game, game,))
         role = self.client.cursor.fetchone()
         if role: # if it exists
             target_role = self.find(role[0], context)
             if target_role is not None: # If it exists in the server
                 # Loading info from the config
                 chapter_prefix, route_prefix = modules.channel.Channel(self.client).fetch_guild_info(context, 'Chapter_prefix', 'Route_prefix')
-                # remove any other progression roles
-                await self.strip_chapter_roles(context, chapter_prefix)
-                await self.strip_route_roles(context, route_prefix)
+                # remove any other progression roles if the game is progressable
+                if role[1] == 1:
+                    await self.strip_chapter_roles(context, chapter_prefix)
+                    await self.strip_route_roles(context, route_prefix)
                 # add the new role
                 await context.message.author.add_roles(target_role)
                 await context.send("Successfully added the {} role.".format(target_role.name))
