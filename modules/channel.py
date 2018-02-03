@@ -91,12 +91,12 @@ class Channel():
             }
             if main_game_role is not None: # End-game permissions
                 overwrites[main_game_role] = discord.PermissionOverwrite(read_messages=True)
-            # default not read chapter permissions
-            overwrites.update(self.set_chapter_perms(12, context, False))
+            # default read chapter permissions
+            overwrites.update(self.set_chapter_perms(12, context, True))
             # chapter permission update based on user's roles
             for role in context.message.author.roles:
                 if re.match("{} \d+".format(guild_info[2]), role.name):
-                    overwrites.update(self.set_chapter_perms(int(re.search('\d+', role.name).group()), context, True))
+                    overwrites.update(self.set_chapter_perms(int(re.search('\d+', role.name).group()), context, False))
                     break
             
             # Creating the channel and setting the category
