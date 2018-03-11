@@ -85,8 +85,7 @@ class Channel():
                 # Everyone
                 context.message.guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 # Creator
-                context.message.author: discord.PermissionOverwrite(read_messages=True),
-                context.message.author: discord.PermissionOverwrite(manage_messages=True),
+                context.message.author: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
                 # Bot
                 context.message.guild.me: discord.PermissionOverwrite(read_messages=True)
             }
