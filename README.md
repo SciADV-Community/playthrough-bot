@@ -13,7 +13,7 @@ Set up the other non-personal channels and roles for the chapters / game complet
 
 # Installation
 The installation of this bot is very simple, one needs to:
-* Download the latest python 3 version.
+* Download the latest python 3 version. (Up to 3.6. asyncio does not work with 3.7)
 * Install the latest version of the Discord.py rewrite branch (see installation instructions on the discord.py github linked at the top)
 * Edit sample_config.py to have a valid bot token and valid bot master ID
 * Rename sample_config.py to config.py
