@@ -21,7 +21,7 @@ class Admin():
                     await context.send("Game {} not found".format(value))
                     valid = False
             elif field == "Archive_category" or field == "Start_category":
-                if discord.utils.find(lambda c: c.id == value, context.message.guild.categories) is None:
+                if discord.utils.find(lambda c: c.id == int(value), context.message.guild.categories) is None:
                     await context.send("No category with such ID exists.")
                     valid = False
             elif field != "Guild_Name" and field != "Chapter_prefix" and field != "Route_prefix":
