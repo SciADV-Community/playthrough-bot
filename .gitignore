@@ -1,0 +1,9 @@
+# IDE
+.vscode/
+.idea
+
+# Python
+__pycache__
+
+# Bot
+config.py

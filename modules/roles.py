@@ -54,11 +54,16 @@ class Roles:
             await self.strip_chapter_roles(context, chapter_prefix)
             match = chapter_prefix + ' {}' # String we are going to find a role with
             c = modules.channel.Channel(self.client) # To check if the user has a channel
-            channel = discord.utils.find(lambda cha: cha.id == c.owns(context), context.message.guild.text_channels)
-            if channel is not None: # if he has a channel
-                overwrites = c.set_chapter_perms(int(arg), context, False) # Block permissions up until the chapter he just completed
-                for role, perm in overwrites.items():
-                    await channel.set_permissions(role, overwrite=perm)
+            channels = c.owns(context)
+            if channels:
+                for channel in channels:
+                    main_game = c.fetch_guild_info(context, 'Main_Game')[0]
+                    if channel[1] == main_game:
+                        chan = discord.utils.find(lambda cha: cha.id == channel[0], context.message.guild.text_channels)
+                        if chan is not None: # if he has a channel
+                            overwrites = c.set_chapter_perms(int(arg), context, False) # Block permissions up until the chapter he just completed
+                            for role, perm in overwrites.items():
+                                await chan.set_permissions(role, overwrite=perm)
                 
         else: # If we have a route
             arg = arg.capitalize()
@@ -75,7 +80,7 @@ class Roles:
     @commands.command(pass_context=True)
     async def finished(self, context, *, game: str):
         # Getting the role for the game
-        self.client.cursor.execute("SELECT Role_Name, Progress FROM Game JOIN Game_Alias ON Game.Name = Game_Alias.Game_Name WHERE Game.Name = ? OR Game_Alias.Alias = ?", (game, game,))
+        self.client.cursor.execute("SELECT Role_Name, Progress FROM Game JOIN Game_Alias ON Game.Name = Game_Alias.Game_Name WHERE Game.Name = ? OR Game_Alias.Alias = ?", (game, game.lower(),))
         role = self.client.cursor.fetchone()
         if role: # if it exists
             target_role = self.find(role[0], context)

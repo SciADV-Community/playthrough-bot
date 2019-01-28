@@ -1,4 +1,4 @@
-#!python3
+#!/usr/bin/python3.5
 import sqlite3, asyncio, discord
 from discord.ext import commands
 import config, db_setup

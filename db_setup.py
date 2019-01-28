@@ -29,13 +29,22 @@ def table_setup(client):
         Guild_Name VARCHAR(255) NOT NULL,
         Chapter_prefix VARCHAR(255) DEFAULT '{0}',
         Route_prefix VARCHAR(255) DEFAULT '{1}',
-        Start_category INT UNIQUE,
-        Archive_category INT UNIQUE,
         Main_Game VARCHAR(255),
         PRIMARY KEY(Guild_ID),
         FOREIGN KEY(Main_Game) REFERENCES Game(Name)
     )
     '''.format(config.ch_prefix, config.route_suffix))
+    # Table to hold Game <-> Guild connections
+    client.cursor.execute('''
+    CREATE TABLE IF NOT EXISTS Game_Guild (
+        Game_Name VARCHAR(255) NOT NULL,
+        Guild_ID INT NOT NULL,
+        Start_category INT UNIQUE,
+        Archive_category INT UNIQUE,
+        PRIMARY KEY(Game_Name, Guild_ID),
+        FOREIGN KEY(Game_Name) REFERENCES Game(Name)
+    )
+    ''')
     # Table to hold alternate game aliases
     client.cursor.execute('''
     CREATE TABLE IF NOT EXISTS Game_Alias (
@@ -51,8 +60,10 @@ def table_setup(client):
         ID INT UNIQUE NOT NULL,
         Owner INT NOT NULL,
         Guild INT NOT NULL,
+        Game VARCHAR(255) NOT NULL,
         PRIMARY KEY(ID),
-        FOREIGN KEY(Guild) REFERENCES Config(Guild_ID)
+        FOREIGN KEY(Guild) REFERENCES Config(Guild_ID),
+        FOREIGN KEY(Game) REFERENCES Game(Name)
     )
     ''')
     client.cursor.execute('''

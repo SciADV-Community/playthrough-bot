@@ -13,10 +13,10 @@ class Channel():
     def owns(self, context):
         ret = None
 
-        self.client.cursor.execute("SELECT ID FROM Channel WHERE Owner = ? AND Guild = ?", (context.message.author.id, context.message.guild.id))
-        channel = self.client.cursor.fetchone()
-        if channel:
-            ret = channel[0]
+        self.client.cursor.execute("SELECT ID, Game FROM Channel WHERE Owner = ? AND Guild = ?", (context.message.author.id, context.message.guild.id))
+        channels = self.client.cursor.fetchall()
+        if channels:
+            ret = channels
 
         return ret
     
@@ -33,6 +33,19 @@ class Channel():
         self.client.cursor.execute(query, (context.message.guild.id,))
         return self.client.cursor.fetchone()
 
+    def fetch_game_guild_info(self, context, game, *fields):
+        columns = ""
+        for i in range(0, len(fields)):
+            columns += fields[i]
+            if i != len(fields) - 1:
+                columns += ", "
+
+        query="SELECT {0} FROM Game_Guild WHERE Guild_ID = ? AND Game_Name = ?".format(columns)
+
+        self.client.cursor.execute(query, (context.message.guild.id, game,))
+        return self.client.cursor.fetchone()
+
+
     # Allow/Block read permissions up to a certain chapter
     def set_chapter_perms(self, chapter, context, read):
         overwrite = dict()
@@ -47,82 +60,100 @@ class Channel():
     ### Commands ###
     # Creating a channel
     @commands.command(pass_context = True)
-    async def start(self, context, name: str = None):
-        if self.owns(context) is not None: # if a user already has a channel
-            await context.send("You can only create 1 playthrough channel on this server.")
+    async def start(self, context, game: str, name: str = None):
+        if name is None: # if a name has not been given, give it a default value
+            name = context.message.author.display_name
+
+        # Handling for the default completion role
+        self.client.cursor.execute("SELECT Name, Role_Name, Channel_suffix, Progress FROM Game JOIN Game_Alias ON Game.Name = Game_Alias.Game_Name WHERE Game.Name = ? OR Game_Alias.Alias = ?", (game, game.lower(),))
+        game = self.client.cursor.fetchone()
+
+        if not game:
+            await context.send("No game specified or invalid game.")
+            return
         else:
-            if name is None: # if a name has not been given, give it a default value
-                name = context.message.author.display_name
+            has_channel = False
+            channels = self.owns(context)
+            if channels:
+                for channel in channels:
+                    if channel[1] == game[0]:
+                        has_channel = True
 
-            # Fetching basic info from the guild
-            guild_info = self.fetch_guild_info(context, 'Start_category', 'Main_game', 'Chapter_prefix')
+            if has_channel:
+                await context.send("You can only create 1 playthrough channel on this server for this game.")
+                return
 
-            # Handling for the default category
-            if not guild_info[0]:
-                await context.send("No category to put the new channel in specified, the channel will end up somewhere on the server. Notify someone administrating the server to move it if it's an issue and tell them to set the default category using the `{}admin set Start_category` command.".format(config.mod))
-                category = None
-            else:
-                category = discord.utils.find(lambda c: c.id == guild_info[0], context.message.guild.categories)
+            role_name = game[1]
+            channel_suffix = game[2]
+            print(channel_suffix)
+            main_game_role = modules.roles.Roles(self.client).find(role_name, context)
+            if main_game_role is None:
+                await context.send("The completion role {} for this game is not present in the server! Please let some administrator to create it. For this channel no permissions for those who have completed the game will be applied.".format(role_name))
 
-            # Handling for the default completion role
-            if not guild_info[1]:
-                await context.send("No main game specified. People who have finished the game for this server won't be able to view the new channels. Notify someone administrating the server to add the completion role to the channel manunally and tell them to set the main game for the server using the `{}admin set Main_Game` command.".format(config.mod))
-                main_game_role = None
-                channel_suffix = 'game'
-            else:
-                self.client.cursor.execute("SELECT Role_Name, Channel_suffix FROM Game WHERE Name = ?", (guild_info[1],))
-                game = self.client.cursor.fetchone()
-                role_name = game[0]
-                print(role_name)
-                channel_suffix = game[1]
-                main_game_role = modules.roles.Roles(self.client).find(role_name, context)
-                if main_game_role is None:
-                    await context.send("The completion role {} for this game is not present in the server! Please let some administrator to create it. For this channel no permissions for those who have completed the game will be applied.".format(role_name))
+        # Handling for the default category
+        game_guild_info = self.fetch_game_guild_info(context, game[0], 'Start_category')
+        if not game_guild_info:
+            await context.send("No category to put the new channel in specified")
+            return
+        else:
+            category = discord.utils.find(lambda c: c.id == game_guild_info[0], context.message.guild.categories)
+        
+        # Creating the channel
+        # Setting the permissions
+        overwrites = { # Basic permissions
+            # Everyone
+            context.message.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            # Creator
+            context.message.author: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+            # Bot
+            context.message.guild.me: discord.PermissionOverwrite(read_messages=True)
+        }
+        if main_game_role is not None: # End-game permissions
+            overwrites[main_game_role] = discord.PermissionOverwrite(read_messages=True)
             
-            # Creating the channel
-            # Setting the permissions
-            overwrites = { # Basic permissions
-                # Everyone
-                context.message.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                # Creator
-                context.message.author: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-                # Bot
-                context.message.guild.me: discord.PermissionOverwrite(read_messages=True)
-            }
-            if main_game_role is not None: # End-game permissions
-                overwrites[main_game_role] = discord.PermissionOverwrite(read_messages=True)
-            # default read chapter permissions
-            overwrites.update(self.set_chapter_perms(12, context, True))
-            # chapter permission update based on user's roles
-            for role in context.message.author.roles:
-                if re.match("{} \d+".format(guild_info[2]), role.name):
-                    overwrites.update(self.set_chapter_perms(int(re.search('\d+', role.name).group()), context, False))
-                    break
-            
-            # Creating the channel and setting the category
-            channel = await context.message.guild.create_text_channel('{}-plays-{}'.format(name, channel_suffix), overwrites=overwrites, reason="New playthrough channel!")
-            if category is not None:
-                await channel.edit(category=category)
+        # default read chapter permissions
+        if game[3] == 1:
+        # chapter permission update based on user's roles
+            guild_info = self.fetch_guild_info(context, 'Chapter_prefix', 'Main_Game')
+            if game[0] == guild_info[1]:
+                overwrites.update(self.set_chapter_perms(12, context, True))
+                for role in context.message.author.roles:
+                    if re.match("{} \d+".format(guild_info[0]), role.name):
+                        overwrites.update(self.set_chapter_perms(int(re.search('\d+', role.name).group()), context, False))
+                        break
+        
+        # Creating the channel and setting the category
+        channel = await context.message.guild.create_text_channel('{}-plays-{}'.format(name, channel_suffix), overwrites=overwrites, reason="New playthrough channel!")
+        if category is not None:
+            await channel.edit(category=category)
 
-            # Saving to the database
-            self.client.cursor.execute("INSERT INTO Channel (ID, Owner, Guild) VALUES (?, ?, ?)", (channel.id, context.message.author.id, context.message.guild.id,))
-            self.client.database.commit()
+        # Saving to the database
+        self.client.cursor.execute("INSERT INTO Channel (ID, Owner, Guild, Game) VALUES (?, ?, ?, ?)", (channel.id, context.message.author.id, context.message.guild.id, game[0]))
+        self.client.database.commit()
 
-            await context.send("Successfully created your playthrough channel! Have fun!")
+        await context.send("Successfully created your playthrough channel! Have fun!")
 
     # Archiving a channel
     @commands.command(pass_context=True)
     async def end(self, context):
-        channel = discord.utils.find(lambda c: c.id == self.owns(context), context.message.guild.text_channels)
-        if channel is not None:
-            archive_category = discord.utils.find(lambda c: c.id == self.fetch_guild_info(context, 'Archive_category')[0], context.message.guild.categories)
-            if archive_category:
-                await channel.edit(category=archive_category)
-                await context.send("Archived your playthrough channel. Hope you had fun!")
+        self.client.cursor.execute("SELECT Owner, Game FROM Channel WHERE ID = ?", (context.message.channel.id,))
+        chan = self.client.cursor.fetchone()
+        if not chan:
+            await context.send("You don't have permissions to move this channel.")
+        if int(chan[0]) == context.message.author.id:
+            channel = discord.utils.find(lambda c: c.id == context.message.channel.id, context.message.guild.text_channels)
+            if channel is not None:
+                archive_category = discord.utils.find(lambda c: c.id == self.fetch_game_guild_info(context, chan[1], 'Archive_category')[0], context.message.guild.categories)
+                if archive_category:
+                    await channel.edit(category=archive_category)
+                    await context.send("Archived your playthrough channel. Hope you had fun!")
+                else:
+                    await context.send("No archive category set. Channel not archived. Let an administrator know that they should add an archiving category using the command `{}admin set Archive_category`".format(config.mod))
             else:
-                await context.send("No archive category set. Channel not archived. Let an administrator know that they should add an archiving category using the command `{}admin set Archive_category`".format(config.mod))
+                await context.send("You have not even started a playthrough yet! `{}end` is not if you have finished the game, use `{}finished` instead!.".format(config.mod, config.mod))
         else:
-            context.send("You have not even started a playthrough yet! `{}end` is not if you have finished the game, use `{}finished` instead!.".format(config.mod, config.mod))
+            await context.send("You don't have permissions to move this channel.")
+        
 
 def setup(client):
     client.add_cog(Channel(client))
