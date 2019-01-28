@@ -17,4 +17,5 @@ The installation of this bot is very simple, one needs to:
 * Install the latest version of the Discord.py rewrite branch (see installation instructions on the discord.py github linked at the top)
 * Edit sample_config.py to have a valid bot token and valid bot master ID
 * Rename sample_config.py to config.py
+* (Optional) Rename playthrough.db to be appropriate to the db name you specify in config.py
 * Run bot.py
